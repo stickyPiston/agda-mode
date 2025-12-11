@@ -26,10 +26,8 @@
   },
   "scripts": {
     "vscode:prepublish": "pnpm run build",
-    "build": "agda --js --js-es6 --compile-dir=out src/Webview.agda && agda --js --js-es6 --compile-dir=out src/Extension.agda && cp src/extension.js out"
-  },
-  "devDependencies": {
-    "@vscode/test-cli": "^0.0.12",
-    "@vscode/test-electron": "^2.5.2"
+    "build:webview": "cd modules/agda-mode && agda --js --js-es6 --compile-dir=../../out --library-file=../../libraries --no-default-libraries src/Webview.agda",
+    "build:extension": "cd modules/agda-mode && agda --js --js-es6 --compile-dir=../../out --library-file=../../libraries --no-default-libraries src/Extension.agda",
+    "build": "pnpm build:webview && pnpm build:extension && cp modules/agda-mode/src/extension.js out"
   }
 }

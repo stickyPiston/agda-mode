@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<!--
+HTML script demonstrating how to embed Iepje applications in a website
+This script expects these files to be served from the same directory:
+  * style.css in the same directory (for laying out this page)
+  * A directory js/ containing ES6-compiled Agda code (to execute)
+  * A directory html/ containing HTML-compiled Agda code (to display upon the user clicking 'view source')
+-->
+<head>
+  <meta charset="utf-8">
+  <title>Iepje Examples Gallery</title>
+  <script type="module" src="js/jAgda.Iepje.Examples.Gallery.mjs"></script>
+  <link rel="stylesheet" type="text/css" href="style.css"/>
+</head>
+<html>
+  <body>
+    <h1>Iepje Examples Gallery</h1>
+    <div class="examples">
+      <div>
+        <a href="html/Iepje.Examples.Hello.html" target="_blank">Hello</a>
+        <div id="hello-app"></div>
+      </div>
+      <div>
+        <a href="html/Iepje.Examples.Counter.html" target="_blank">Counter</a>
+        <div id="counter-app"></div>
+      </div>
+      <div>
+        <a href="html/Iepje.Examples.Tic-Tac-Toe.html" target="_blank">Tic Tac Toe</a>
+        <div id="ttt-game"></div>
+      </div>
+      <div>
+        <a href="html/Iepje.Examples.Stopwatch.html" target="_blank">Stopwatch</a>
+        <div id="stopwatch-app"></div>
+      </div>
+      <div>
+        <a href="html/Iepje.Examples.Pong.html" target="_blank">Pong</a>
+        <div id="pong-game"></div>
+      </div>
+      <div>
+        <a href="html/Iepje.Examples.Dragger.html" target="_blank">Dragger</a>
+        <div id="dragger-app"></div>
+      </div>
+      <div>
+        <a href="html/Iepje.Examples.Time.html" target="_blank">Time</a>
+        <div id="time-counter-app"></div>
+      </div>
+    </div>
+  </body>
+</html> 
