@@ -25,21 +25,10 @@
     ]
   },
   "scripts": {
-    "vscode:prepublish": "pnpm run compile",
-    "compile": "tsc -p ./",
-    "watch": "tsc -watch -p ./",
-    "pretest": "pnpm run compile && pnpm run lint",
-    "lint": "eslint src",
-    "test": "vscode-test",
-    "build": "agda --js --js-es6 --compile-dir=out src/Webview.agda && agda --js --js-es6 --compile-dir=out src/Extension.agda && tsc -p ./"
+    "vscode:prepublish": "pnpm run build",
+    "build": "agda --js --js-es6 --compile-dir=out src/Webview.agda && agda --js --js-es6 --compile-dir=out src/Extension.agda && cp src/extension.js out"
   },
   "devDependencies": {
-    "@types/vscode": "^1.106.1",
-    "@types/mocha": "^10.0.10",
-    "@types/node": "22.x",
-    "typescript-eslint": "^8.46.3",
-    "eslint": "^9.39.1",
-    "typescript": "^5.9.3",
     "@vscode/test-cli": "^0.0.12",
     "@vscode/test-electron": "^2.5.2"
   }
