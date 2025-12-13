@@ -3,8 +3,10 @@ module Extension where
 open import Iepje.Internal.JS.Language.IO
 open import Iepje.Internal.JS.Language.PrimitiveTypes
 open import Iepje.Internal.JS.Language.MutableReferences
-open import Iepje.Prelude
+open import Iepje.Prelude hiding (Maybe; just; nothing)
 open import Agda.Builtin.List
+open import Agda.Builtin.Maybe
+open import Communication
 
 postulate
     Command : Set
@@ -21,7 +23,7 @@ postulate
     toWebviewUri : Panel → string → string
     log : ∀{A : Set} → A → IO null
     postMessage : Panel → IO null
-    onMessage : Panel → ExtensionContext → IO null → IO null
+    onMessage : Panel → ExtensionContext → (JSON → IO null) → IO null
 
 {-# COMPILE JS registerCommand = vscode => name => action => cont => cont(vscode.commands.registerCommand(name, () => { action(_ => {}) })) #-}
 {-# COMPILE JS createWebviewPanel = vscode => cont => cont(vscode.window.createWebviewPanel("window", "window", vscode.ViewColumn.One, { enableScripts: true }))  #-}
@@ -32,7 +34,7 @@ postulate
 {-# COMPILE JS toWebviewUri = panel => url => panel.webview.asWebviewUri(url) #-}
 {-# COMPILE JS setHtml = html => panel => cont => { panel.webview.html = html; cont(null) } #-}
 {-# COMPILE JS postMessage = panel => cont => { panel.webview.postMessage(null); cont(null) } #-}
-{-# COMPILE JS onMessage = panel => ctx => action => cont => { panel.webview.onDidReceiveMessage(() => action(() => {}), undefined, ctx.subscriptions); cont(null); } #-}
+{-# COMPILE JS onMessage = panel => ctx => action => cont => { panel.webview.onDidReceiveMessage(msg => action(msg)(() => {}), undefined, ctx.subscriptions); cont(null); } #-}
 
 openWebviewPanel : vsc → ExtensionContext → Ref (Maybe Panel) → IO null
 openWebviewPanel vscode context ref = do
@@ -41,7 +43,10 @@ openWebviewPanel vscode context ref = do
     _ ← setHtml ("<html><body><main></main><script type=\"module\" src="
         ++ toWebviewUri panel (joinPath vscode (extensionUri context ∷ "out" ∷ "jAgda.Webview.mjs" ∷ []))
         ++ "></script></body></html>") panel
-    onMessage panel context (log "Received message from webview!")
+    onMessage panel context λ json → case (decode json) of λ where
+        (just a) → log "Received a!"
+        (just b) → log "Received b!"
+        nothing  → log "Could not parse message"
 
 sendMessage : Ref (Maybe Panel) → IO null
 sendMessage panel =

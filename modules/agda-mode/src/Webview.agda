@@ -1,5 +1,7 @@
 module Webview where
 
+open import Communication
+
 open import Iepje.Prelude
 open import Iepje.Internal.JS.Language.IO
 open import Iepje.Internal.JS.Language.PrimitiveTypes
@@ -12,16 +14,13 @@ postulate onMessage : Window → (null → IO ⊤) → IO null
 data Cmd : Set where
     message-received button-pressed : Cmd
 
-data Msg : Set where
-    a b : Msg
-
 message-effect : Effect Cmd
 message-effect = from λ dispatch → do
   w ← document >>= get-defaultView
   _ ← onMessage w λ _ → dispatch message-received
   pure tt
 
-postulate internal-post-message : Msg → IO null
+postulate internal-post-message : JSON → IO null
 {-# COMPILE JS internal-post-message = msg => cont => { acquireVsCodeApi().postMessage(msg); cont(null) } #-}
 
 postulate log : ∀ {A : Set} → A → IO null
@@ -29,8 +28,7 @@ postulate log : ∀ {A : Set} → A → IO null
 
 post-message : ∀ {A} → Msg → Effect A
 post-message msg = from λ _ → do
-    _ ← log msg
-    _ ← internal-post-message msg
+    _ ← internal-post-message (encode msg)
     pure tt
 
 main : IO ⊤
