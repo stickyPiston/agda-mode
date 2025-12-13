@@ -9,7 +9,7 @@ open import Iepje.Internal.JS.WebAPIs.DOM
 open import Iepje.Internal.Effect
 
 postulate onMessage : Window → (null → IO ⊤) → IO null
-{-# COMPILE JS onMessage = win => dispatch => cont => { win.addEventListener("message", () => { console.log(dispatch); dispatch(null)(() => {}) }); cont(null) } #-}
+{-# COMPILE JS onMessage = win => dispatch => cont => { win.addEventListener("message", () => { dispatch(null)(() => {}) }); cont(null) } #-}
 
 postulate vsc-api : Set
 
@@ -31,9 +31,6 @@ acquire-vscode-effect = from λ dispatch → dispatch $ acquired-vscode acquire-
 
 postulate internal-post-message : vsc-api → JSON → IO null
 {-# COMPILE JS internal-post-message = api => msg => cont => { api.postMessage(msg); cont(null) } #-}
-
-postulate log : ∀ { A : Set } → A → IO null
-{-# COMPILE JS log = _ => thing => cont => { console.log(thing); cont(null) } #-}
 
 post-message : ∀ { A msg : Set } ⦃ r : Cloneable msg ⦄ → vsc-api → msg → Effect A
 post-message vsc msg = from λ _ → do
