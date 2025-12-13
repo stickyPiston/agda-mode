@@ -6,6 +6,7 @@ open import Iepje.Internal.Utils hiding (_×_)
 open import Agda.Builtin.List
 open import Agda.Builtin.Nat
 open import Agda.Builtin.Maybe
+open import Agda.Builtin.Equality
 
 data _×_ (A B : Set) : Set where
     _,_ : A → B → A × B
@@ -49,11 +50,23 @@ data Msg : Set where
 
 -- ...as long as we define encode and decode functions for it.
 -- The decode function can make use of plain pattern matching.
-encode : Msg → JSON
-encode a = j-array (j-string "a" ∷ [])
-encode b = j-array (j-string "b" ∷ [])
+record Cloneable (A : Set) : Set where field
+    encode : A → JSON 
+    decode : JSON → Maybe A
+    encode-decode-dual : ∀ a → decode (encode a) ≡ just a
+open Cloneable ⦃ ... ⦄ public
 
-decode : JSON → Maybe Msg
-decode (j-array (j-string "a" ∷ [])) = just a
-decode (j-array (j-string "b" ∷ [])) = just b
-decode _ = nothing
+instance
+    MsgCloneable : Cloneable Msg 
+    MsgCloneable = record
+        { encode = λ where
+            a → j-array (j-string "a" ∷ [])
+            b → j-array (j-string "b" ∷ [])
+        ; decode = λ where
+            (j-array (j-string "a" ∷ [])) → just a
+            (j-array (j-string "b" ∷ [])) → just b
+            _ → nothing
+        ; encode-decode-dual = λ where
+            a → refl
+            b → refl
+        }

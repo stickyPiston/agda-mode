@@ -23,10 +23,10 @@ message-effect = from λ dispatch → do
 postulate internal-post-message : JSON → IO null
 {-# COMPILE JS internal-post-message = msg => cont => { acquireVsCodeApi().postMessage(msg); cont(null) } #-}
 
-postulate log : ∀ {A : Set} → A → IO null
+postulate log : ∀ { A : Set } → A → IO null
 {-# COMPILE JS log = _ => thing => cont => { console.log(thing); cont(null) } #-}
 
-post-message : ∀ {A} → Msg → Effect A
+post-message : ∀ { A msg : Set } ⦃ r : Cloneable msg ⦄ → msg → Effect A
 post-message msg = from λ _ → do
     _ ← internal-post-message (encode msg)
     pure tt
