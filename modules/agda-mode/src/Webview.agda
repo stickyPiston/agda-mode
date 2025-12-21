@@ -2,7 +2,8 @@ module Webview where
 
 open import Communication
 
-open import Iepje.Prelude
+open import Iepje.Prelude hiding (Maybe ; nothing ; just)
+open import Prelude.Maybe
 open import Iepje.Internal.JS.Language.IO
 open import Iepje.Internal.JS.Language.PrimitiveTypes
 open import Iepje.Internal.JS.WebAPIs.DOM

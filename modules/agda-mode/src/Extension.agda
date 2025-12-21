@@ -3,10 +3,16 @@ module Extension where
 open import Iepje.Internal.JS.Language.IO
 open import Iepje.Internal.JS.Language.PrimitiveTypes
 open import Iepje.Internal.JS.Language.MutableReferences
-open import Iepje.Prelude hiding (Maybe; just; nothing; interact; _>>_)
-open import Iepje.Internal.Utils hiding (_×_)
+open import Iepje.Prelude hiding (Maybe; just; nothing; interact; length; _>>_)
+open import Iepje.Internal.Utils using (forM_; _>>_)
+
+open import Prelude.Nat using (ℕ ; _-_)
+open import Prelude.Sigma
+open import Prelude.Vec as Vec
+open import Prelude.Maybe
+
 open import Agda.Builtin.List
-open import Agda.Builtin.Maybe
+
 open import Communication
 
 the : (A : Set) → A → A
@@ -66,9 +72,11 @@ postulate write : Process → String → IO null
 postulate read : Process → IO String
 {-# COMPILE JS read = proc => cont => cont(proc.stdout.read()) #-}
 
-postulate on-data : Process → (String → IO ⊤) → IO ⊤
+postulate Buffer : Set
+
+postulate on-data : Process → (Buffer → IO ⊤) → IO ⊤
 {-# COMPILE JS on-data = proc => handler => cont => {
-    proc.stdout.on("data", data => { handler(data.toString())(() => {}) });
+    proc.stdout.on("data", data => { handler(data)(() => {}) });
     cont(a => a["tt"]())
 } #-}
 
@@ -90,17 +98,17 @@ data vsc-cmd (msg : Set) : Set where
 
 postulate queue-ref : Set → Set
 
-postulate new-queue-ref : ∀ {A} → IO (queue-ref A)
+postulate new-queue-ref : ∀ {A : Set} → IO (queue-ref A)
 {-# COMPILE JS new-queue-ref = _ => cont => cont({ val: [] }) #-}
 
-postulate enqueue : ∀ {A} → queue-ref A → A → IO ⊤
+postulate enqueue : ∀ {A : Set} → queue-ref A → A → IO ⊤
 {-# COMPILE JS enqueue = _ => queueRef => a => cont => { queueRef.val.push(a); cont(a => a["tt"]()) } #-}
 
-postulate dequeue : ∀ {A} → queue-ref A → IO (Maybe A)
+postulate dequeue : ∀ {A : Set} → queue-ref A → IO (Maybe A)
 {-# COMPILE JS dequeue = _ => queueRef => cont => 
-    cont(b => queueRef.val.length === 0 ? b["nothing"]() : b["just"](queueRef.val.shift())) #-}
+    cont(queueRef.val.length === 0 ? undefined : queueRef.val.shift()) #-}
 
-postulate empty? : ∀ {A} → queue-ref A → IO boolean
+postulate empty? : ∀ {A : Set} → queue-ref A → IO boolean
 {-# COMPILE JS empty? = _ => queueRef => cont => { cont(queueRef.val.length === 0) } #-}
 
 record Cmd (msg : Set) : Set where field
@@ -147,6 +155,7 @@ interact {model = modelₜ} {msg = msgₜ} (init-model , init-cmds) commands upd
 record Model : Set where field
     panel : Maybe Panel
     proc : Process
+    stdout-buffer : String
 
 data Msg : Set where
     -- Vscode messages
@@ -155,7 +164,7 @@ data Msg : Set where
     panel-opened : Panel → Msg
     
     -- Agda messages
-    agda-update : JSON → Msg
+    agda-stdout-update : Buffer → Msg
 
     -- Webview messages
     received-webview : WebviewMsg → Msg
@@ -190,23 +199,25 @@ send-over-stdin-cmd proc =
 postulate parse-json : String → Maybe JSON
 {-# COMPILE JS parse-json = input => {
     try {
-        const json = JSON.parse(input);
-        console.log(json);
+        return JSON.parse(input);
     } catch (_e) {
-        console.log(input, _e);
+        return undefined;
     }
-    return a => a["nothing"]();
 } #-}
 
-read-stdout-cmd : Process → (JSON → Msg) → Cmd Msg
+read-stdout-cmd : Process → (Buffer → Msg) → Cmd Msg
 read-stdout-cmd proc stdin-msg = mk-Cmd λ dispatch →
-    on-data proc λ d →
-        case parse-json d of λ where
-            (just json) → trace json $ dispatch (stdin-msg json)
-            nothing     → pure tt
+    on-data proc λ d → dispatch (stdin-msg d)
+
+postulate buffer-from : String → Buffer
+{-# COMPILE JS buffer-from = Buffer.from #-}
 
 init : Process → Model × Cmd Msg
-init proc = record { panel = nothing ; proc = proc } , read-stdout-cmd proc agda-update
+init proc = record
+    { panel = nothing
+    ; proc = proc
+    ; stdout-buffer = ""
+    } , read-stdout-cmd proc agda-stdout-update
 
 commands : List (vsc-cmd Msg)
 commands =
@@ -214,10 +225,66 @@ commands =
     ∷ command "agda-mode.load-file" load-file-msg
     ∷ []
 
+postulate _==ᵇ_ : Buffer → Buffer → Bool
+{-# COMPILE JS _==ᵇ_ = b1 => b2 => Buffer.compare(b1, b2) === 0 #-}
+
+postulate buffer-concat : Buffer → Buffer → Buffer
+{-# COMPILE JS buffer-concat = b1 => b2 => Buffer.concat([b1, b2]) #-}
+
+postulate buffer-toString : Buffer → String
+{-# COMPILE JS buffer-toString = buf => buf.toString() #-}
+
+postulate try : ∀ {A : Set} → (⊤ → A) → A
+{-# COMPILE JS try = _ => a => {
+    try { return a(); } catch (e) { console.log(e); throw e; }
+} #-}
+
+postulate split : String → String → Σ[ n ∈ ℕ ] Vec.Vec String (suc n)
+{-# COMPILE JS split = input => on => {
+    /* Array.prototype.split always returns at least one split even if the input string is empty */
+    const splits = input.split(on); 
+    return [BigInt(splits.length), splits];
+} #-}
+
+-- TODO: Make n and m Fin k
+postulate slice : ∀ {A : Set} {k} → Vec.Vec A k → (n : ℕ) → (m : ℕ) → Vec.Vec A (m - n)
+{-# COMPILE JS slice = _ => _ => l => n => m => l.slice(Number(n), Number(m)) #-}
+
+postulate length : ∀ {A : Set} {n} → Vec.Vec A n → ℕ
+{-# COMPILE JS length = _ => _ => l => l.length #-}
+
+vec-init : ∀ {A : Set} {n} → Vec.Vec A (suc n) → Vec.Vec A n
+vec-init {n = n} as = slice as 0 n
+
+postulate last : ∀ {A : Set} {n : ℕ} → Vec.Vec A (suc n) → A
+{-# COMPILE JS last = _ => _ => l => l[l.length - 1] #-}
+
+unsnoc : ∀ {A : Set} {n : ℕ} → Vec.Vec A (suc n) → (Vec.Vec A n × A)
+unsnoc xs = vec-init xs , last xs
+
+postulate string-slice : Nat → String → String
+{-# COMPILE JS string-slice = n => s => s.slice(Number(n)) #-}
+
+postulate _starts-with_ : String → String → Bool
+{-# COMPILE JS _starts-with_ = a => b => a.startsWith(b) #-}
+
+postulate vec-map : ∀ {A B : Set} {n : ℕ} → (A → B) → Vec.Vec A n → Vec.Vec B n
+{-# COMPILE JS vec-map = _ => _ => _ => f => l => l.map(f) #-}
+
+parse-response : String → Maybe JSON
+parse-response response =
+    let truncated-response = if response starts-with "JSON> " then string-slice 6 response else response
+     in parse-json truncated-response
+
 update : System → Model → Msg → Model × Cmd Msg
-update record { process = process ; vscode = vscode ; context = context } model = λ where
+update record { process = process ; vscode = vscode ; context = context } model msg = case msg of λ where
     load-file-msg → model , send-over-stdin-cmd (Model.proc model)
-    (agda-update json) → trace json $ model , none
+    (agda-stdout-update buffer) →
+        -- TODO: Agda duplicates the computation of the rhs when pattern matching on a record like this
+        let n , lines = split (Model.stdout-buffer model ++ buffer-toString buffer) "\n"
+            responses , new-buffer = unsnoc lines
+            k , parsed-responses = Vec.map-maybe parse-response responses
+         in trace parsed-responses $ record model { stdout-buffer = new-buffer } , none
 
     open-webview-msg → model , open-panel-cmd vscode context panel-opened received-webview
     (panel-opened panel) → record model { panel = just panel } , none
