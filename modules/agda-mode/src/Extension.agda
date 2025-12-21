@@ -14,6 +14,7 @@ open import Prelude.Maybe
 open import Agda.Builtin.List
 
 open import Communication
+open import Response
 
 the : (A : Set) → A → A
 the _ t = t
@@ -196,15 +197,6 @@ send-over-stdin-cmd proc =
         write proc $ "IOTCM \"" ++ path ++ "\" NonInteractive Direct (Cmd_load \"" ++ path ++ "\" [])\n"
         pure tt
 
-postulate parse-json : String → Maybe JSON
-{-# COMPILE JS parse-json = input => {
-    try {
-        return JSON.parse(input);
-    } catch (_e) {
-        return undefined;
-    }
-} #-}
-
 read-stdout-cmd : Process → (Buffer → Msg) → Cmd Msg
 read-stdout-cmd proc stdin-msg = mk-Cmd λ dispatch →
     on-data proc λ d → dispatch (stdin-msg d)
@@ -262,19 +254,8 @@ postulate last : ∀ {A : Set} {n : ℕ} → Vec.Vec A (suc n) → A
 unsnoc : ∀ {A : Set} {n : ℕ} → Vec.Vec A (suc n) → (Vec.Vec A n × A)
 unsnoc xs = vec-init xs , last xs
 
-postulate string-slice : Nat → String → String
-{-# COMPILE JS string-slice = n => s => s.slice(Number(n)) #-}
-
-postulate _starts-with_ : String → String → Bool
-{-# COMPILE JS _starts-with_ = a => b => a.startsWith(b) #-}
-
 postulate vec-map : ∀ {A B : Set} {n : ℕ} → (A → B) → Vec.Vec A n → Vec.Vec B n
 {-# COMPILE JS vec-map = _ => _ => _ => f => l => l.map(f) #-}
-
-parse-response : String → Maybe JSON
-parse-response response =
-    let truncated-response = if response starts-with "JSON> " then string-slice 6 response else response
-     in parse-json truncated-response
 
 update : System → Model → Msg → Model × Cmd Msg
 update record { process = process ; vscode = vscode ; context = context } model msg = case msg of λ where
