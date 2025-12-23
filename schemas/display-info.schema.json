@@ -1,0 +1,58 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://github.com/stickyPiston/agda-mode-vscode/blob/main/schemas/display-info.schema.json",
+    "title": "Display info response",
+    "properties": {
+        "kind": { "const": "DisplayInfo" },
+        "info": { "oneOf": [
+            {
+                "type": "object",
+                "properties": {
+                    "kind": { "const": "Error" },
+                    "error": {
+                        "type": "object",
+                        "properties": {
+                            "message": { "type": "string" }
+                        }
+                    }
+                }
+            },
+            {
+                "type": "object",
+                "properties": {
+                    "kind": { "const": "AllGoalsWarnings" },
+                    "errors": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "message": { "type": "string" }
+                            }
+                        }
+                    },
+                    "warnings": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "message": { "type": "string" }
+                            }
+                        }
+                    },
+                    "invisibleGoals": {
+                        "type": "array",
+                        "description": "Invisible goals",
+                        "$comment": "TODO: Encode all the goal types",
+                        "items": true
+                    },
+                    "visibleGoals": {
+                        "type": "array",
+                        "description": "Invisible goals",
+                        "$comment": "TODO: Encode all the goal types",
+                        "items": true
+                    }
+                }
+            }
+        ] }
+    }
+}
