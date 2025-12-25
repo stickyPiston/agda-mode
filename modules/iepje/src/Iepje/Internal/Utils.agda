@@ -155,7 +155,7 @@ _<=<_ : (B -> IO C) -> (A -> IO B) -> A -> IO C
   pure c
 
 -- Helper for type of _$$_
-IO? : Bool → Set → Set
+IO? : ∀ {ℓ} → Bool → Set ℓ → Set ℓ
 IO? false A =    A
 IO? true  A = IO A
 

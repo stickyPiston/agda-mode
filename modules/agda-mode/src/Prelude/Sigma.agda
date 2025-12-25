@@ -23,5 +23,5 @@ infix 2 Σ-syntax
 
 syntax Σ-syntax A (λ x → B) = Σ[ x ∈ A ] B
 
-_×_ : Set ℓ → Set ℓ → Set ℓ
+_×_ : ∀ {ℓ₁ ℓ₂} → Set ℓ₁ → Set ℓ₂ → Set (ℓ₁ ⊔ ℓ₂)
 A × B = Σ A λ _ → B
