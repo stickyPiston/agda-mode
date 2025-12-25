@@ -12,6 +12,7 @@ open import Prelude.Vec as Vec
 open import Prelude.Maybe
 
 open import Agda.Builtin.List
+open import Agda.Primitive using (lsuc)
 
 open import AgdaMode.Common.Communication
 open import AgdaMode.Common.InteractionResponse
@@ -202,7 +203,7 @@ update-and-process-commands model msgₜ update cmd-queue model-ref msg = do
                 (just new-cmd) → new-cmd (update-and-process-commands model msgₜ update cmd-queue model-ref)
                 nothing → pure tt
 
-data HList : List Set → Set₁ where
+data HList {ℓ} : List (Set ℓ) → Set (lsuc ℓ) where
     []  : HList []
     _∷_ : ∀ {a as} → a → HList as → HList (a ∷ as)
 
