@@ -14,4 +14,4 @@ record Capability (msg : Set) : Set₁ where field
 
     provided-type : Maybe (Σ[ provided-type ∈ Set ] (requirement-type → provided-type))
 
-    register : System → requirement-type → (msg → IO ⊤) → IO Disposable
+    register : System → requirement-type → (msg → IO ⊤) → IO (Maybe Disposable)

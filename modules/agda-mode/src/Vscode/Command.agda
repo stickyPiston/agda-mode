@@ -1,7 +1,8 @@
 module Vscode.Command where
 
 open import Iepje.Internal.JS.Language.IO
-open import Prelude.Maybe
+open import Prelude.Maybe hiding (_<$>_)
+open import Iepje.Internal.Utils using (_<$>_)
 open import Prelude.String
 open import Agda.Builtin.Unit
 open import TEA.Cmd
@@ -18,5 +19,5 @@ command name m = record
     { requirement-type = ⊤
     ; new-requirement = λ _ → pure tt
     ; provided-type = nothing
-    ; register = λ system tt update → register-command (system .vscode) name (update m)
+    ; register = λ system tt update → just <$> register-command (system .vscode) name (update m)
     }

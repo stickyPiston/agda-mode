@@ -28,9 +28,9 @@ data HList {ℓ} : List (Set ℓ) → Set (lsuc ℓ) where
 provide-capability-commands :
     ∀ {model} → System
     → (capabilities : List (Capability msg))
-    → provided-commands-type capabilities (model → msg → model × Cmd msg)
+    → provided-commands-type capabilities (System → model → msg → model × Cmd msg)
     → IO (HList (map requirement-type capabilities) × (model → msg → model × Cmd msg))
-provide-capability-commands sys [] base-update = pure ([] , base-update)
+provide-capability-commands sys [] base-update = pure ([] , base-update sys)
 provide-capability-commands sys (record { new-requirement = new-requirement ; provided-type = nothing } ∷ capabilities) base-update = do
     requirement ← new-requirement sys
     smaller ← provide-capability-commands sys capabilities base-update
@@ -78,7 +78,7 @@ interact :
     ∀ {model}
     → (init : model × Cmd msg)
     → (capabilities : List (Capability msg))
-    → (update : provided-commands-type capabilities (model → msg → model × Cmd msg))
+    → (update : provided-commands-type capabilities (System → model → msg → model × Cmd msg))
     → System
     → IO ⊤
 interact {model} (init-model , init-cmds) capabilities update system = do
@@ -100,4 +100,6 @@ interact {model} (init-model , init-cmds) capabilities update system = do
         register-capabilities model-ref cmd-queue update [] [] = pure tt
         register-capabilities model-ref cmd-queue update (record { register = register } ∷ capabilities) (req ∷ requirements) =
             let update' = update-and-process-commands update cmd-queue model-ref
-             in register system req update' >>= push-subscription (system .context)
+             in register system req update' >>= λ where
+                (just disposable) → push-subscription (system .context) disposable
+                nothing           → pure tt

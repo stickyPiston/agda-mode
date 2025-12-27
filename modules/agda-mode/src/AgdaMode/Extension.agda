@@ -20,37 +20,22 @@ open import TEA.Capability
 open import Vscode.SemanticTokensProvider
 open import Vscode.Command
 open import Vscode.Panel
+open import Vscode.StdioProcess
 
-postulate
-    Process : Set
-
-    log : ∀{A : Set} → A → IO ⊤
-
-{-# COMPILE JS log = _ => thing => cont => { console.log(String(thing)); cont(a => a["tt"]()) } #-}
+-- Debug functions
 
 postulate trace : ∀ {A B : Set} → A → B → B
 {-# COMPILE JS trace = _ => _ => thing => ret => { console.log(thing); return ret } #-}
 
-postulate spawn : process-api → String → List String → IO Process
-{-# COMPILE JS spawn = process => cmd => args => cont => { const p = process.spawn(cmd, args) ; cont(p) } #-}
-
-postulate write : Process → String → IO ⊤
-{-# COMPILE JS write = process => chunk => cont => { process.stdin.write(chunk); process.once("drain", () => {}); cont(a => a["tt"]()) } #-}
-
-postulate read : Process → IO String
-{-# COMPILE JS read = proc => cont => cont(proc.stdout.read()) #-}
-
-postulate Buffer : Set
-
-postulate on-data : Process → (Buffer → IO ⊤) → IO ⊤
-{-# COMPILE JS on-data = proc => handler => cont => {
-    proc.stdout.on("data", data => { handler(data)(() => {}) });
-    cont(a => a["tt"]())
+postulate try : ∀ {A : Set} → (⊤ → A) → A
+{-# COMPILE JS try = _ => a => {
+    try { return a(); } catch (e) { console.log(e); throw e; }
 } #-}
+
+-- Actual app
 
 record Model : Set where field
     panel : Maybe Panel
-    proc : Process
     stdout-buffer : String
 
 -- NO_POSITIVITY_CHECK needed to get around the non-positive position of Msg in token-request-msg
@@ -63,34 +48,18 @@ data Msg : Set where
     token-request-msg : (List SemanticToken → Cmd Msg) → Msg
     
     -- Agda messages
-    agda-stdout-update : Buffer → Msg
+    agda-stdout-update : Buffer.t → Msg
 
     -- Webview messages
     received-webview : WebviewMsg → Msg
 
 open TEA Msg
 
-
-send-over-stdin-cmd : Process → Cmd Msg
-send-over-stdin-cmd proc =
-    let path = "/Users/terra/Desktop/code/agda-ffi-tests/Main.lagda.md"
-     in mk-Cmd λ dispatch → do
-        write proc $ "IOTCM \"" ++ path ++ "\" NonInteractive Direct (Cmd_load \"" ++ path ++ "\" [])\n"
-        pure tt
-
-read-stdout-cmd : Process → (Buffer → Msg) → Cmd Msg
-read-stdout-cmd proc stdin-msg = mk-Cmd λ dispatch →
-    on-data proc λ d → dispatch (stdin-msg d)
-
-postulate buffer-from : String → Buffer
-{-# COMPILE JS buffer-from = Buffer.from #-}
-
-init : Process → Model × Cmd Msg
-init proc = record
+init : Model × Cmd Msg
+init = record
     { panel = nothing
-    ; proc = proc
     ; stdout-buffer = ""
-    } , read-stdout-cmd proc agda-stdout-update
+    } , none
 
 -- TODO: Legend not exhaustive yet
 -- TODO: Make a better api for the legend, maybe something with a Bounded+Enum type class
@@ -102,15 +71,8 @@ capabilities =
       command "agda-mode.open-panel" open-webview-msg
     ∷ command "agda-mode.load-file" load-file-msg
     ∷ semantic-tokens-provider legend token-request-msg (language "agda" ∩ scheme "file")
+    ∷ stdio-process "agda" [ "--interaction-json" ] agda-stdout-update
     ∷ []
-
-postulate buffer-toString : Buffer → String
-{-# COMPILE JS buffer-toString = buf => buf.toString() #-}
-
-postulate try : ∀ {A : Set} → (⊤ → A) → A
-{-# COMPILE JS try = _ => a => {
-    try { return a(); } catch (e) { console.log(e); throw e; }
-} #-}
 
 to-Cmd : Panel → AgdaResponse → Cmd Msg
 to-Cmd panel (DisplayInfo errors _ _ _) = sendMessage panel (show-errors (length errors))
@@ -120,12 +82,17 @@ open-panel record { panel = panel } = case panel of λ where
     nothing  → open-panel-cmd
     (just _) → λ _ _ _ → none
 
-update : System → Cmd Msg → Model → Msg → Model × Cmd Msg
-update system request-token-msg model msg = trace msg $ case msg of λ where
-    load-file-msg → model , batch (send-over-stdin-cmd (Model.proc model) ∷ open-panel model system panel-opened received-webview ∷ [])
+update : Cmd Msg → (String → Cmd Msg) → System → Model → Msg → Model × Cmd Msg
+update request-token-cmd send-over-stdin-cmd system model msg = trace msg $ case msg of λ where
+    load-file-msg →
+        let path = "/Users/terra/Desktop/code/agda-ffi-tests/Main.lagda.md"
+         in model , batch
+            ( send-over-stdin-cmd ("IOTCM \"" ++ path ++ "\" NonInteractive Direct (Cmd_load \"" ++ path ++ "\" [])\n")
+            ∷ open-panel model system panel-opened received-webview
+            ∷ [])
     (agda-stdout-update buffer) → try λ _ →
         -- TODO: Agda duplicates the computation of the rhs when pattern matching on a record like this
-        let n , lines = split (Model.stdout-buffer model ++ buffer-toString buffer) "\n"
+        let n , lines = split (Model.stdout-buffer model ++ Buffer.toString buffer) "\n"
             responses , new-buffer = unsnoc lines
             k , parsed-responses = map-maybe parse-response responses
          in trace responses $ record model { stdout-buffer = new-buffer } , case (Model.panel model) of λ where
@@ -140,6 +107,4 @@ update system request-token-msg model msg = trace msg $ case msg of λ where
     (received-webview wmsg) → model , none
 
 activate : System → IO ⊤
-activate sys = do
-    proc ← spawn (sys .process) "agda" [ "--interaction-json" ]
-    interact (init proc) capabilities (update sys) sys
+activate = interact init capabilities update

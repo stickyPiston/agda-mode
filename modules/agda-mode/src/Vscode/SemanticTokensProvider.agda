@@ -3,7 +3,7 @@ module Vscode.SemanticTokensProvider where
 open import Prelude.List
 open import Prelude.JSON
 open import Prelude.Sigma
-open import Prelude.Maybe
+open import Prelude.Maybe hiding (_<$>_)
 open import Prelude.Nat
 open import Agda.Builtin.String
 open import TEA.System
@@ -12,7 +12,7 @@ open import Iepje.Internal.JS.Language.IO
 open import Agda.Builtin.Unit
 open import TEA.Capability
 open import TEA.Cmd
-open import Iepje.Internal.Utils using (_$_ ; forM ; _>>_)
+open import Iepje.Internal.Utils using (_$_ ; forM ; _>>_ ; _<$>_)
 
 -- TODO: If there is a use for it, then allow event emitter to have a type parameter
 module EventEmitter where
@@ -89,5 +89,5 @@ semantic-tokens-provider {msg} legend on-request-msg selector = record
                 builder ← SemanticTokensBuilder.new vscode
                 forM tokens λ t → SemanticTokensBuilder.push builder (t .line) (t .char) (t .length) (t .token-type) (t .modifier)
                 SemanticTokensBuilder.build builder >>= return
-         in register-semantic-tokens-provider vscode (encode-language-filter selector) requirement provider (legend vscode)
+         in just <$> register-semantic-tokens-provider vscode (encode-language-filter selector) requirement provider (legend vscode)
     }
