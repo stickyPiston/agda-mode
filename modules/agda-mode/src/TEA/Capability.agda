@@ -10,7 +10,7 @@ postulate Disposable : Set
 
 record Capability (msg : Set) : Set₁ where field
     requirement-type : Set
-    new-requirement : IO requirement-type
+    new-requirement : System → IO requirement-type
 
     provided-type : Maybe (Σ[ provided-type ∈ Set ] (requirement-type → provided-type))
 

@@ -94,8 +94,8 @@ init proc = record
 
 -- TODO: Legend not exhaustive yet
 -- TODO: Make a better api for the legend, maybe something with a Bounded+Enum type class
-legend : vscode-api → Legend
-legend = mk-Legend ("comment" ∷ "namespace" ∷ "enum" ∷ "type" ∷ "enumMember" ∷ []) ("defaultLibrary" ∷ [])
+legend : vscode-api → Legend.t
+legend = Legend.new ("comment" ∷ "namespace" ∷ "enum" ∷ "type" ∷ "enumMember" ∷ []) ("defaultLibrary" ∷ [])
 
 capabilities : List (Capability Msg)
 capabilities =

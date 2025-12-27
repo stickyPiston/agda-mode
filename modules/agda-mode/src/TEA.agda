@@ -26,20 +26,20 @@ data HList {ℓ} : List (Set ℓ) → Set (lsuc ℓ) where
     _∷_ : ∀ {a as} → a → HList as → HList (a ∷ as)
 
 provide-capability-commands :
-    ∀ {model}
+    ∀ {model} → System
     → (capabilities : List (Capability msg))
     → provided-commands-type capabilities (model → msg → model × Cmd msg)
     → IO (HList (map requirement-type capabilities) × (model → msg → model × Cmd msg))
-provide-capability-commands [] base-update = pure ([] , base-update)
-provide-capability-commands (record { new-requirement = new-requirement ; provided-type = nothing } ∷ capabilities) base-update = do
-    requirement ← new-requirement
-    smaller ← provide-capability-commands capabilities base-update
+provide-capability-commands sys [] base-update = pure ([] , base-update)
+provide-capability-commands sys (record { new-requirement = new-requirement ; provided-type = nothing } ∷ capabilities) base-update = do
+    requirement ← new-requirement sys
+    smaller ← provide-capability-commands sys capabilities base-update
     pure ((requirement ∷ Σ.proj₁ smaller) , Σ.proj₂ smaller)
-provide-capability-commands (record
+provide-capability-commands sys (record
     { requirement-type = requirement-type ; new-requirement = new-requirement
     ; provided-type = just (provided-type , create-provided-type) ; register = register } ∷ capabilities) base-update = do
-    requirement ← new-requirement
-    smaller ← provide-capability-commands capabilities (base-update (create-provided-type requirement))
+    requirement ← new-requirement sys
+    smaller ← provide-capability-commands sys capabilities (base-update (create-provided-type requirement))
     pure ((requirement ∷ Σ.proj₁ smaller) , Σ.proj₂ smaller)
 
 postulate queue-ref : Set → Set
@@ -85,7 +85,7 @@ interact {model} (init-model , init-cmds) capabilities update system = do
     model-ref ← new init-model
     cmd-queue ← new-queue-ref { (msg → IO ⊤) → IO ⊤ }
 
-    requirements , update-with-capabilities ← provide-capability-commands capabilities update
+    requirements , update-with-capabilities ← provide-capability-commands system capabilities update
 
     forM (Cmd.actions init-cmds) λ action →
         action (update-and-process-commands update-with-capabilities cmd-queue model-ref)

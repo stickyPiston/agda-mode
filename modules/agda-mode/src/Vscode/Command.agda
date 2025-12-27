@@ -16,7 +16,7 @@ postulate register-command : vscode-api → String → IO ⊤ → IO Disposable
 command : ∀ {msg} → String → msg → Capability msg
 command name m = record
     { requirement-type = ⊤
-    ; new-requirement = pure tt
+    ; new-requirement = λ _ → pure tt
     ; provided-type = nothing
     ; register = λ system tt update → register-command (system .vscode) name (update m)
     }

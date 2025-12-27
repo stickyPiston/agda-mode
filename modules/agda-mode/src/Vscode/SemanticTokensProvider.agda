@@ -4,6 +4,7 @@ open import Prelude.List
 open import Prelude.JSON
 open import Prelude.Sigma
 open import Prelude.Maybe
+open import Prelude.Nat
 open import Agda.Builtin.String
 open import TEA.System
 open System
@@ -11,12 +12,17 @@ open import Iepje.Internal.JS.Language.IO
 open import Agda.Builtin.Unit
 open import TEA.Capability
 open import TEA.Cmd
+open import Iepje.Internal.Utils using (_$_ ; forM ; _>>_)
 
-postulate EventEmitter : Set
+-- TODO: If there is a use for it, then allow event emitter to have a type parameter
+module EventEmitter where
+    postulate t : Set
 
-postulate new-event-emitter : IO EventEmitter
+    postulate new : vscode-api → IO t
+    {-# COMPILE JS new = vscode => cont => cont(new vscode.EventEmitter()) #-}
 
-postulate fire : EventEmitter → IO ⊤
+    postulate fire : t → IO ⊤
+    {-# COMPILE JS fire = emitter => cont => { emitter.fire() ; cont(a => a["tt"]()) } #-}
 
 data LanguageFilter : Set where
     language scheme path-pattern : String → LanguageFilter
@@ -31,16 +37,33 @@ encode-language-filter filter = j-object (kvs filter)
         kvs (path-pattern x) = [ "pattern" , j-string x ]
         kvs (l ∩ r) = kvs l ++ kvs r
 
-postulate Legend SemanticToken : Set
+module Legend where
+    postulate t : Set
 
-postulate mk-Legend : List String → List String → vscode-api → Legend
-{-# COMPILE JS mk-Legend = types => mods => vscode => new vscode.SemanticTokensLegend(types, mods) #-}
+    postulate new : List String → List String → vscode-api → t
+    {-# COMPILE JS new = types => mods => vscode => new vscode.SemanticTokensLegend(types, mods) #-}
 
-postulate Document CancellationToken : Set
+postulate Document CancellationToken SemanticTokens : Set
+
+record SemanticToken : Set where field
+    line char length token-type modifier : ℕ
+open SemanticToken
+
+-- ocaml-esque modules
+module SemanticTokensBuilder where
+    postulate t : Set
+
+    postulate new : vscode-api → IO t
+    {-# COMPILE JS new = vscode => cont => cont(new vscode.SemanticTokensBuilder()) #-}
+
+    postulate build : t → IO SemanticTokens
+    {-# COMPILE JS build = t => cont => cont(t.build()) #-}
+
+    postulate push : t → (line char length token-type modifier : ℕ) → IO ⊤
+    {-# COMPILE JS push = t => line => char => length => tokenType => mod => cont => { t.push(line, char, length, tokenType, mod) ; cont(a => a["tt"]()) } #-}
 
 -- TODO: Handle cancellations
--- TODO: resolve takes the output of SemanticTokensBuilder.build()
-postulate register-semantic-tokens-provider : vscode-api → JSON → EventEmitter → (Document → CancellationToken → (return : List SemanticToken → IO ⊤) → IO ⊤) → Legend → IO Disposable
+postulate register-semantic-tokens-provider : vscode-api → JSON → EventEmitter.t → (Document → CancellationToken → (return : SemanticTokens → IO ⊤) → IO ⊤) → Legend.t → IO Disposable
 {-# COMPILE JS register-semantic-tokens-provider = vscode => selector => onChangeEmitter => provider => legend => vscode.languages.registerDocumentSemanticTokensProvider(
     selector,
     {
@@ -52,16 +75,19 @@ postulate register-semantic-tokens-provider : vscode-api → JSON → EventEmitt
 
 semantic-tokens-provider :
     ∀ {msg}
-    → (vscode-api → Legend)
+    → (vscode-api → Legend.t)
     → ((List SemanticToken → Cmd msg) → msg)
     → LanguageFilter
     → Capability msg
 semantic-tokens-provider {msg} legend on-request-msg selector = record
-    { requirement-type = EventEmitter
-    ; new-requirement = new-event-emitter
-    ; provided-type = just (Cmd msg , λ on-change-emitter → mk-Cmd λ  _ → fire on-change-emitter)
+    { requirement-type = EventEmitter.t
+    ; new-requirement = λ sys → EventEmitter.new (sys .vscode)
+    ; provided-type = just (Cmd msg , λ on-change-emitter → mk-Cmd λ  _ → EventEmitter.fire on-change-emitter)
     ; register = λ system requirement update →
         let vscode = system .vscode
-            provider = λ doc token return → update (on-request-msg λ tokens → mk-Cmd λ _ → return tokens)
+            provider = λ doc token return → update $ on-request-msg λ tokens → mk-Cmd λ _ → do
+                builder ← SemanticTokensBuilder.new vscode
+                forM tokens λ t → SemanticTokensBuilder.push builder (t .line) (t .char) (t .length) (t .token-type) (t .modifier)
+                SemanticTokensBuilder.build builder >>= return
          in register-semantic-tokens-provider vscode (encode-language-filter selector) requirement provider (legend vscode)
     }
