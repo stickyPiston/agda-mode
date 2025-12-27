@@ -1,33 +1,30 @@
 module AgdaMode.Extension where
 
 open import Iepje.Internal.JS.Language.IO
-open import Iepje.Internal.JS.Language.PrimitiveTypes
-open import Iepje.Internal.JS.Language.MutableReferences
-open import Iepje.Prelude hiding (Maybe; just; nothing; interact; _>>_) renaming (_++_ to _++ˢ_)
-open import Iepje.Internal.Utils using (forM; _>>_; _<$>_)
+open import Iepje.Prelude hiding (Maybe; just; nothing; interact; _>>_)
+open import Iepje.Internal.Utils using (_>>_)
 
-open import Prelude.Nat using (ℕ ; _-_)
 open import Prelude.Sigma
-open import Prelude.Vec as Vec
+open import Prelude.Vec using (unsnoc ; map-maybe ; to-list)
+open import Prelude.List using (map ; [_])
 open import Prelude.Maybe
-open import Prelude.List
 open import Prelude.String
-
-open import Agda.Primitive using (lsuc)
 
 open import AgdaMode.Common.Communication
 open import AgdaMode.Common.InteractionResponse
-open import Prelude.JSON
 import TEA
 open import TEA.Cmd
 open import TEA.System
+open System
+open import TEA.Capability
 open import Vscode.SemanticTokensProvider
+open import Vscode.Command
 open import Vscode.Panel
 
 postulate
     Process : Set
 
-    log : ∀{A : Set} → A → IO null
+    log : ∀{A : Set} → A → IO ⊤
 
 {-# COMPILE JS log = _ => thing => cont => { console.log(String(thing)); cont(a => a["tt"]()) } #-}
 
@@ -37,8 +34,8 @@ postulate trace : ∀ {A B : Set} → A → B → B
 postulate spawn : process-api → String → List String → IO Process
 {-# COMPILE JS spawn = process => cmd => args => cont => { const p = process.spawn(cmd, args) ; cont(p) } #-}
 
-postulate write : Process → String → IO null
-{-# COMPILE JS write = process => chunk => cont => { process.stdin.write(chunk); process.once("drain", () => {}); cont(null) } #-}
+postulate write : Process → String → IO ⊤
+{-# COMPILE JS write = process => chunk => cont => { process.stdin.write(chunk); process.once("drain", () => {}); cont(a => a["tt"]()) } #-}
 
 postulate read : Process → IO String
 {-# COMPILE JS read = proc => cont => cont(proc.stdout.read()) #-}
@@ -78,7 +75,7 @@ send-over-stdin-cmd : Process → Cmd Msg
 send-over-stdin-cmd proc =
     let path = "/Users/terra/Desktop/code/agda-ffi-tests/Main.lagda.md"
      in mk-Cmd λ dispatch → do
-        write proc $ "IOTCM \"" ++ˢ path ++ˢ "\" NonInteractive Direct (Cmd_load \"" ++ˢ path ++ˢ "\" [])\n"
+        write proc $ "IOTCM \"" ++ path ++ "\" NonInteractive Direct (Cmd_load \"" ++ path ++ "\" [])\n"
         pure tt
 
 read-stdout-cmd : Process → (Buffer → Msg) → Cmd Msg
@@ -128,11 +125,11 @@ update system request-token-msg model msg = trace msg $ case msg of λ where
     load-file-msg → model , batch (send-over-stdin-cmd (Model.proc model) ∷ open-panel model system panel-opened received-webview ∷ [])
     (agda-stdout-update buffer) → try λ _ →
         -- TODO: Agda duplicates the computation of the rhs when pattern matching on a record like this
-        let n , lines = split (Model.stdout-buffer model ++ˢ buffer-toString buffer) "\n"
+        let n , lines = split (Model.stdout-buffer model ++ buffer-toString buffer) "\n"
             responses , new-buffer = unsnoc lines
-            k , parsed-responses = Vec.map-maybe parse-response responses
+            k , parsed-responses = map-maybe parse-response responses
          in trace responses $ record model { stdout-buffer = new-buffer } , case (Model.panel model) of λ where
-            (just panel) → batch $ map (to-Cmd panel) $ Vec.to-list parsed-responses
+            (just panel) → batch $ map (to-Cmd panel) $ to-list parsed-responses
             nothing → none
 
     open-webview-msg → model , open-panel model system panel-opened received-webview
@@ -144,5 +141,5 @@ update system request-token-msg model msg = trace msg $ case msg of λ where
 
 activate : System → IO ⊤
 activate sys = do
-    proc ← spawn (System.process sys) "agda" [ "--interaction-json" ]
+    proc ← spawn (sys .process) "agda" [ "--interaction-json" ]
     interact (init proc) capabilities (update sys) sys
