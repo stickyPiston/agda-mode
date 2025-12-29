@@ -3,7 +3,6 @@ module Prelude.List where
 open import Agda.Builtin.List public
 open import Iepje.Internal.Utils using (map) public
 open import Iepje.Internal.JS.Language.IO
-open import Prelude.Maybe
 open import Agda.Primitive
 
 private variable
@@ -26,14 +25,6 @@ concat = foldr _++_ []
 
 concat-map : (A → List B) → List A → List B
 concat-map f as = concat (map f as)
-
-justs : List (Maybe A) → List A
-justs [] = []
-justs (nothing ∷ as) = justs as
-justs (just a ∷ as) = a ∷ justs as
-
-map-maybe : (A → Maybe B) → List A → List B
-map-maybe f as = justs (map f as)
 
 foldrM : (A → B → IO B) → B → List A → IO B
 foldrM f b [] = pure b

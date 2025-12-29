@@ -4,7 +4,7 @@ open import Agda.Primitive using (Level ; _⊔_)
 
 open import Prelude.Sigma
 open import Prelude.Nat using (ℕ ; suc ; _-_)
-open import Prelude.Maybe
+open import Prelude.Maybe using (Maybe ; just ; nothing)
 open import Iepje.Internal.Utils using (case_of_)
 open import Agda.Builtin.List using (List)
 
