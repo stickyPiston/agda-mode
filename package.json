@@ -23,14 +23,11 @@
 				]
 			}
 		],
-    "commands": [
-      {
-        "command": "agda-mode.open-panel",
-        "title": "Open the Webview panel"
-      },
+    "keybindings": [
       {
         "command": "agda-mode.load-file",
-        "title": "Load an agda file"
+        "when": "editorTextFocus && !editorHasSelection && editorLangId =~ /agda/",
+        "key": "ctrl+c ctrl+l"
       }
     ]
   },
