@@ -11,6 +11,7 @@ private variable
 const : A → B → A
 const a _ = a
 
+infixr 10 _∘_
 _∘_ : (B → C) → (A → B) → A → C
 f ∘ g = λ x → f (g x)
 

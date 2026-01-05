@@ -15,6 +15,9 @@ private postulate trace : ∀ {ℓ₁ ℓ₂} {A : Set ℓ₁} {B : Set ℓ₂} 
 module TextEditor where
     postulate t : Set
 
+    postulate active-editor : vscode-api → IO t
+    {-# COMPILE JS active-editor = vscode => cont => cont(vscode.window.activeTextEditor) #-}
+
     postulate document : t → TextDocument.t
     {-# COMPILE JS document = editor => editor.document #-}
 
@@ -27,5 +30,7 @@ on-did-change-active-text-editor text-editor-msg = record
   { requirement-type = ⊤
   ; new-requirement = λ x → pure tt
   ; provided-type = nothing
-  ; register = λ sys _ update → just <$> on-did-change-active-text-editor-listener (sys .vscode) (update ∘ text-editor-msg)
+  ; register = λ sys _ update → do
+        TextEditor.active-editor (sys .vscode) >>= (update ∘ text-editor-msg ∘ just)
+        just <$> on-did-change-active-text-editor-listener (sys .vscode) (update ∘ text-editor-msg)
   }

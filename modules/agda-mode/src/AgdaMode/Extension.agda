@@ -110,7 +110,6 @@ update request-token-cmd send-over-stdin-cmd system model msg = trace msg $ case
     --       If one isn't given then, it will just ignore subsequent replies. Ideally, we would use 
     --       reject with a busy message.
     (token-request-msg doc return-tokens-cmd) → from-Maybe (model , return-tokens-cmd []) do
-        _ ← trace (model .loaded-files) $ pure tt
         tokens ← model .loaded-files !? TextDocument.file-name doc
         let highlighting-tokens = make-highlighting-tokens (system .vscode) doc tokens
         pure $ model , return-tokens-cmd highlighting-tokens
